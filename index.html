@@ -205,12 +205,57 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
 .hidden{display:none!important}
 .fade-in{animation:fadeUp .55s cubic-bezier(.22,.61,.36,1) both}
 @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+/* ── 複習卡片 ── */
+.deck-stage{position:relative;margin:18px 0 6px;height:min(52vh,430px);perspective:1200px;touch-action:pan-y}
+.deck-stage .ghost-card{
+  position:absolute;inset:0;border-radius:20px;border:1px solid var(--line);
+  background:var(--glass);transform:scale(.94) translateY(14px);opacity:.55;
+}
+.deck-stage .ghost-card.two{transform:scale(.88) translateY(26px);opacity:.3}
+.card{
+  position:absolute;inset:0;border-radius:20px;padding:26px 26px 22px;
+  border:1px solid var(--gold-dim);
+  background:
+    linear-gradient(150deg, rgba(243,236,223,.10), rgba(243,236,223,.035)),
+    var(--ink-2);
+  box-shadow:0 30px 60px -32px rgba(0,0,0,.9), 0 1px 0 rgba(255,255,255,.06) inset;
+  backdrop-filter:blur(14px) saturate(1.1);
+  display:flex;flex-direction:column;justify-content:center;gap:14px;
+  cursor:pointer;will-change:transform;transition:transform .32s cubic-bezier(.22,.61,.36,1), opacity .32s;
+  overflow:hidden;
+}
+.card.dragging{transition:none}
+.card .card-meta{font-size:11px;color:var(--paper-dim);letter-spacing:.16em;display:flex;justify-content:space-between;gap:10px}
+.card .front{font-size:clamp(22px,4.4vw,34px);letter-spacing:.06em;line-height:1.4;color:#f6efe2}
+.card .back{font-size:15px;line-height:1.9;color:var(--paper-dim);border-top:1px dashed var(--line);padding-top:14px;max-height:56%;overflow-y:auto;padding-right:6px;animation:fadeUp .35s cubic-bezier(.22,.61,.36,1) both}
+.card .hintflip{font-size:11.5px;color:rgba(200,169,106,.7);letter-spacing:.14em}
+.card .stamp{
+  position:absolute;top:22px;padding:6px 12px;border-radius:8px;font-size:13px;letter-spacing:.14em;
+  border:1.5px solid currentColor;opacity:0;transform:rotate(-8deg) scale(.9);transition:opacity .12s
+}
+.card .stamp.ok{right:20px;color:var(--ok)}
+.card .stamp.no{left:20px;color:var(--cinnabar);transform:rotate(8deg) scale(.9)}
+.deck-actions{display:flex;gap:12px;margin-top:16px}
+.deck-actions button{flex:1;padding:15px 10px;border-radius:14px;font-family:inherit;font-size:15px;letter-spacing:.14em;cursor:pointer;transition:transform .2s, box-shadow .2s}
+.deck-actions .no{color:#f0c9c3;border:1px solid rgba(194,85,74,.55);background:rgba(194,85,74,.12)}
+.deck-actions .ok{color:#d8f0e6;border:1px solid rgba(95,174,140,.5);background:rgba(95,174,140,.12)}
+.deck-actions button:active{transform:scale(.97)}
+.deck-actions button:disabled{opacity:.4;cursor:default}
+.deck-count{display:flex;gap:16px;font-size:11.5px;color:var(--paper-dim);letter-spacing:.12em}
+.deck-count b{color:#efe6d5;font-weight:600}
+.deck-done{text-align:center;padding:34px 10px}
+.deck-done .big{font-size:26px;letter-spacing:.1em;margin-bottom:8px}
+.deck-done .sub2{font-size:13px;color:var(--paper-dim)}
+
 @media (max-width:600px){
   h1{font-size:21px}
   .panel{padding:20px 17px}
   .stem{font-size:17px}
   .opt{font-size:14.5px;padding:13px 14px}
   .app{padding:22px 14px 56px}
+  .deck-stage{height:min(58vh,380px)}
+  .card{padding:20px 18px}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
@@ -251,6 +296,7 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
 
       <div class="footer-actions">
         <button class="cta" id="btnStart">開 始 練 習</button>
+        <button class="cta ghost" id="btnCards">卡 片 複 習</button>
         <button class="cta ghost" id="btnReset">清除紀錄</button>
         <span class="note" id="pickInfo"></span>
       </div>
@@ -279,6 +325,47 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
         <button class="cta" id="btnNext">下一題</button>
         <button class="cta ghost" id="btnQuit">結束本回</button>
         <span class="note">按 1–4 作答 · Enter 前進 · ← 回上一題</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 複習卡片 -->
+  <section id="cards" class="hidden">
+    <div class="panel">
+      <div class="topbar">
+        <span class="qcount" id="cardCount">01 / 20</span>
+        <div class="progress"><i id="cardBar"></i></div>
+        <span class="qcount" id="cardTally">確定 0 · 不熟 0</span>
+      </div>
+
+      <div class="deck-stage" id="deckStage">
+        <div class="ghost-card two"></div>
+        <div class="ghost-card one"></div>
+        <div class="card" id="cardEl">
+          <span class="stamp ok" id="stampOk">確定</span>
+          <span class="stamp no" id="stampNo">不熟</span>
+          <div class="card-meta"><span id="cardCh"></span><span id="cardId"></span></div>
+          <div class="front" id="cardFront"></div>
+          <div class="back hidden" id="cardBack"></div>
+          <div class="hintflip" id="cardHint">點一下看答案 · 右滑＝確定 · 左滑＝不熟</div>
+        </div>
+      </div>
+
+      <div class="deck-actions">
+        <button class="no" id="btnUnknown">不 熟</button>
+        <button class="ok" id="btnKnown">確 定</button>
+      </div>
+      <div class="footer-actions" style="margin-top:14px">
+        <button class="cta ghost" id="btnCardQuit">結束複習</button>
+        <span class="note">鍵盤 ↑/空白 翻面 · → 確定 · ← 不熟</span>
+      </div>
+      <div class="deck-done hidden" id="cardDone">
+        <div class="big" id="doneTitle">這一輪複習完了</div>
+        <div class="sub2" id="doneLine"></div>
+        <div class="footer-actions" style="justify-content:center;margin-top:22px">
+          <button class="cta" id="btnRedoUnknown">再複習不熟</button>
+          <button class="cta ghost" id="btnCardBack">回設定</button>
+        </div>
       </div>
     </div>
   </section>
@@ -340,6 +427,7 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
 <script src="data/16-gen-basic.js"></script>
 <script src="data/17-gen-diagnosis.js"></script>
 <script src="data/18-gen-internal.js"></script>
+<script src="data/20-cards.js"></script>
 <script>
 (function(){
   "use strict";
@@ -653,6 +741,167 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
     refreshInfo();
     $("#setup").scrollIntoView({behavior:"smooth", block:"start"});
   };
+
+  /* ── 複習卡片 ── */
+  const CARDS = (window.TCM_CARDS || []);
+  let weakCards = LS.get("tcm_cards_weak_v1", {}) || {};
+  const deck = { queue: [], idx: 0, flipped: false, known: 0, unknown: 0, busy: false };
+
+  function cardPool(){
+    if(!CARDS.length) return [];
+    let pool = CARDS.filter(c => c.sub === ACTIVE && state.chapters.has(c.ch));
+    if(!pool.length) pool = CARDS.filter(c => c.sub === ACTIVE);
+    return pool;
+  }
+
+  $("#btnCards").onclick = () => {
+    const pool = cardPool();
+    if(!pool.length){ $("#pickInfo").textContent = "本科尚無卡片"; return; }
+    deck.queue = pool.slice();
+    for(let i = deck.queue.length - 1; i > 0; i--){
+      const j = Math.floor(Math.random() * (i + 1));
+      [deck.queue[i], deck.queue[j]] = [deck.queue[j], deck.queue[i]];
+    }
+    deck.idx = 0; deck.known = 0; deck.unknown = 0; deck.flipped = false; deck.busy = false;
+    $("#setup").classList.add("hidden");
+    $("#result").classList.add("hidden");
+    $("#quiz").classList.add("hidden");
+    $("#cards").classList.remove("hidden");
+    $("#cardDone").classList.add("hidden");
+    $("#deckStage").classList.remove("hidden");
+    $(".deck-actions").style.display = "";
+    $("#btnCardQuit").classList.remove("hidden");
+    $("#cards").scrollIntoView({behavior:"smooth", block:"start"});
+    renderCard();
+  };
+
+  function renderCard(){
+    const c = deck.queue[deck.idx];
+    if(!c) return finishDeck();
+    deck.flipped = false;
+    deck.busy = false;
+    const el = $("#cardEl");
+    el.style.transition = "none";
+    el.style.transform = "translateX(0) rotate(0deg)";
+    el.style.opacity = 1;
+    el.classList.remove("dragging");
+    $("#stampOk").style.opacity = 0;
+    $("#stampNo").style.opacity = 0;
+    $("#cardCh").textContent = c.ch;
+    $("#cardId").textContent = c.id;
+    $("#cardFront").textContent = c.front;
+    $("#cardBack").textContent = c.back;
+    $("#cardBack").classList.add("hidden");
+    $("#cardEl").classList.remove("flipped");
+    $("#cardHint").textContent = "點一下看答案 · 右滑＝確定 · 左滑＝不熟";
+    $("#cardCount").textContent = `${String(deck.idx + 1).padStart(2, "0")} / ${String(deck.queue.length).padStart(2, "0")}`;
+    $("#cardBar").style.width = (deck.idx / deck.queue.length * 100) + "%";
+    $("#cardTally").textContent = `確定 ${deck.known} · 不熟 ${deck.unknown}`;
+  }
+
+  function flipCard(){
+    const c = deck.queue[deck.idx];
+    if(!c || deck.flipped) return;
+    deck.flipped = true;
+    $("#cardEl").classList.add("flipped");
+    $("#cardBack").classList.remove("hidden");
+    $("#cardHint").textContent = "右滑＝確定　左滑＝不熟";
+  }
+
+  function decide(dir){
+    const c = deck.queue[deck.idx];
+    if(!c || deck.busy) return;
+    deck.busy = true;
+    const el = $("#cardEl");
+    if(dir === "ok"){
+      deck.known++;
+      if(weakCards[c.id]){ delete weakCards[c.id]; LS.set("tcm_cards_weak_v1", weakCards); }
+    }else{
+      deck.unknown++;
+      weakCards[c.id] = 1; LS.set("tcm_cards_weak_v1", weakCards);
+    }
+    $("#cardTally").textContent = `確定 ${deck.known} · 不熟 ${deck.unknown}`;
+    el.style.transition = "transform .34s cubic-bezier(.22,.61,.36,1), opacity .34s";
+    el.style.transform = `translateX(${dir === "ok" ? 140 : -140}%) rotate(${dir === "ok" ? 16 : -16}deg)`;
+    el.style.opacity = 0;
+    setTimeout(() => { deck.idx++; renderCard(); }, 300);
+  }
+
+  function finishDeck(){
+    $("#deckStage").classList.add("hidden");
+    $(".deck-actions").style.display = "none";
+    $("#btnCardQuit").classList.add("hidden");
+    $("#cardDone").classList.remove("hidden");
+    $("#doneTitle").textContent = deck.known + deck.unknown ? "這一輪複習完了" : "沒有卡片";
+    $("#doneLine").textContent = `確定 ${deck.known} 張 · 不熟 ${deck.unknown} 張（不熟卡片已記下，下次可再練）`;
+    $("#cardBar").style.width = "100%";
+  }
+
+  /* 翻面：點卡片（拖曳超過門檻則不算點擊） */
+  let drag = { on: false, x0: 0, dx: 0, moved: false };
+
+  $("#cardEl").addEventListener("pointerdown", e => {
+    if(deck.busy) return;
+    drag.on = true; drag.x0 = e.clientX; drag.dx = 0; drag.moved = false;
+    $("#cardEl").classList.add("dragging");
+    try { $("#cardEl").setPointerCapture(e.pointerId); } catch(_) {}
+  });
+  $("#cardEl").addEventListener("pointermove", e => {
+    if(!drag.on) return;
+    drag.dx = e.clientX - drag.x0;
+    if(Math.abs(drag.dx) > 8) drag.moved = true;
+    const el = $("#cardEl");
+    el.style.transform = `translateX(${drag.dx}px) rotate(${drag.dx / 26}deg)`;
+    $("#stampOk").style.opacity = drag.dx > 0 ? Math.min(1, drag.dx / 90) : 0;
+    $("#stampNo").style.opacity = drag.dx < 0 ? Math.min(1, -drag.dx / 90) : 0;
+  });
+  function endDrag(e){
+    if(!drag.on) return;
+    drag.on = false;
+    const el = $("#cardEl");
+    el.classList.remove("dragging");
+    const th = 90;
+    if(drag.dx > th){ decide("ok"); return; }
+    if(drag.dx < -th){ decide("no"); return; }
+    el.style.transition = "transform .3s cubic-bezier(.22,.61,.36,1)";
+    el.style.transform = "translateX(0) rotate(0deg)";
+    $("#stampOk").style.opacity = 0;
+    $("#stampNo").style.opacity = 0;
+    if(!drag.moved && e && e.type === "pointerup") flipCard();
+  }
+  $("#cardEl").addEventListener("pointerup", endDrag);
+  $("#cardEl").addEventListener("pointercancel", endDrag);
+
+  $("#btnKnown").onclick = () => decide("ok");
+  $("#btnUnknown").onclick = () => decide("no");
+  $("#btnCardQuit").onclick = () => {
+    $("#cards").classList.add("hidden");
+    $("#setup").classList.remove("hidden");
+    refreshInfo();
+  };
+  $("#btnCardBack").onclick = () => {
+    $("#cards").classList.add("hidden");
+    $("#setup").classList.remove("hidden");
+    refreshInfo();
+  };
+  $("#btnRedoUnknown").onclick = () => {
+    const list = CARDS.filter(c => weakCards[c.id]);
+    if(!list.length){ $("#doneLine").textContent = "目前沒有標為不熟的卡片。"; return; }
+    deck.queue = list.slice();
+    deck.idx = 0; deck.known = 0; deck.unknown = 0;
+    $("#cardDone").classList.add("hidden");
+    $("#deckStage").classList.remove("hidden");
+    $(".deck-actions").style.display = "";
+    $("#btnCardQuit").classList.remove("hidden");
+    renderCard();
+  };
+
+  document.addEventListener("keydown", e => {
+    if($("#cards").classList.contains("hidden")) return;
+    if(e.key === "ArrowRight"){ e.preventDefault(); decide("ok"); }
+    else if(e.key === "ArrowLeft"){ e.preventDefault(); decide("no"); }
+    else if(e.key === "ArrowUp" || e.key === " " || e.key === "Enter"){ e.preventDefault(); flipCard(); }
+  });
 
   /* ── init ── */
   useSubject("diagnosis");

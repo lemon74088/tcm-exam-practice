@@ -51,7 +51,8 @@
 │   ├─ 15-gen-gynecology.js  112
 │   ├─ 16-gen-basic.js       142
 │   ├─ 17-gen-diagnosis.js   144
-│   └─ 18-gen-internal.js    218
+│   ├─ 18-gen-internal.js    218
+│   └─ 20-cards.js           723  複習卡片（build-cards.js 產出，與題庫共用知識點表）
 ├─ tools/
 │   ├─ facts/                  ★ 知識點表（擴充題量的來源）
 │   │   ├─ materia.js          148 個知識點（藥名／功效／主治／用法）
@@ -64,8 +65,9 @@
 │   │   ├─ basic.js             71（概念／內涵／補充）
 │   │   └─ diagnosis.js         73（症候體徵／表現／主病）
 │   ├─ generate.js         依知識點批量出題（node tools/generate.js）
-│   ├─ rebalance.js        打散手寫題的答案位置（一次性，已跑過）
 │   ├─ build.js            檢驗＋匯出（node tools/build.js）
+│   ├─ build-cards.js      由知識點表產生複習卡片（node tools/build-cards.js）
+│   ├─ rebalance.js        打散手寫題的答案位置（一次性，已跑過）
 │   ├─ split.js            一次性拆分腳本（歷史用，勿重跑）
 │   ├─ preview.py          產生自動操作預覽頁供截圖自檢
 │   └─ validate.py         舊版 python 檢驗（可留可刪）
@@ -170,6 +172,7 @@ node tools/build.js（結構檢查、重複檢查、匯出 CSV／JSON）
 ## 5. 介面功能
 
 - 科目卡切換（九科，卡上直接顯示該科題數），章節多選、題數（全部／10／20／30／50）、隨機排序、只練錯題
+- **卡片複習（複習卡片）**：與題庫共用同一份知識點表產生的 723 張卡；正面名稱、點一下翻面看功效／治法／定位；**右滑＝確定、左滑＝不熟**（桌機可按鈕或 → ← 鍵），不熟的卡存本機，可「再複習不熟」
 - 作答即時判對錯、解析同步展開；鍵盤 `1–4` 作答、`Enter` 前進、`←` 回上一題
 - **上一題**：回頭看已作答的題目，選項與解析原樣還原（不會重複計分，作答後不可改答案）
 - **結束本回**：中途跳出練習，直接進成績頁；一題都還沒答則回首頁設定
