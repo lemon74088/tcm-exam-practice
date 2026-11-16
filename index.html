@@ -242,6 +242,8 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
 .deck-actions button{flex:1;padding:15px 10px;border-radius:14px;font-family:inherit;font-size:15px;letter-spacing:.14em;cursor:pointer;transition:transform .2s, box-shadow .2s}
 .deck-actions .no{color:#f0c9c3;border:1px solid rgba(194,85,74,.55);background:rgba(194,85,74,.12)}
 .deck-actions .ok{color:#d8f0e6;border:1px solid rgba(95,174,140,.5);background:rgba(95,174,140,.12)}
+.deck-actions .no.on{background:rgba(194,85,74,.3);box-shadow:0 0 0 1px rgba(194,85,74,.75) inset,0 10px 26px -16px rgba(194,85,74,.9)}
+.deck-actions .ok.on{background:rgba(95,174,140,.3);box-shadow:0 0 0 1px rgba(95,174,140,.7) inset,0 10px 26px -16px rgba(95,174,140,.9)}
 .deck-actions button:active{transform:scale(.97)}
 .deck-actions button:disabled{opacity:.4;cursor:default}
 .deck-count{display:flex;gap:16px;font-size:11.5px;color:var(--paper-dim);letter-spacing:.12em}
@@ -360,8 +362,9 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
         <button class="ok" id="btnKnown">確 定</button>
       </div>
       <div class="footer-actions" style="margin-top:14px">
+        <button class="cta" id="btnNextCard">下 一 張</button>
         <button class="cta ghost" id="btnCardQuit">結束複習</button>
-        <span class="note">鍵盤 1–4 作答 · → 確定 · ← 不熟 · 空白 下一張</span>
+        <span class="note">作答或按「確定／不熟」後可換下一張 · 方向鍵也可判定</span>
       </div>
       <div class="deck-done hidden" id="cardDone">
         <div class="big" id="doneTitle">這一輪複習完了</div>
@@ -745,9 +748,9 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
     $("#setup").scrollIntoView({behavior:"smooth", block:"start"});
   };
 
-  /* ── 複習卡片（選擇題版）── */
+  /* ── 複習卡片（選擇題版，作答後仍可自行改判 確定／不熟）── */
   let weakCards = LS.get("tcm_cards_weak_v1", {}) || {};
-  const deck = { queue: [], idx: 0, judged: false, right: 0, wrong: 0, busy: false };
+  const deck = { queue: [], idx: 0, judged: false, record: null, right: 0, wrong: 0, busy: false };
 
   function shuffleCopy(arr){
     const a = arr.slice();
@@ -770,7 +773,8 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
     if(!pool.length){ $("#pickInfo").textContent = "本科尚無題目"; return; }
     deck.queue = shuffleCopy(pool);
     if(state.limit) deck.queue = deck.queue.slice(0, state.limit);
-    deck.idx = 0; deck.right = 0; deck.wrong = 0; deck.judged = false; deck.busy = false;
+    deck.idx = 0; deck.right = 0; deck.wrong = 0;
+    deck.judged = false; deck.record = null; deck.busy = false;
     $("#setup").classList.add("hidden");
     $("#result").classList.add("hidden");
     $("#quiz").classList.add("hidden");
@@ -783,10 +787,23 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
     renderCard();
   };
 
+  function tally(){
+    $("#cardTally").textContent = `確定 ${deck.right} · 不熟 ${deck.wrong}`;
+  }
+
+  function paintRecord(){
+    $("#btnKnown").classList.toggle("on", deck.record === "ok");
+    $("#btnUnknown").classList.toggle("on", deck.record === "no");
+    const ready = deck.record !== null;
+    $("#btnNextCard").disabled = !ready;
+    $("#btnNextCard").style.opacity = ready ? 1 : .45;
+  }
+
   function renderCard(){
     const q = deck.queue[deck.idx];
     if(!q) return finishDeck();
     deck.judged = false;
+    deck.record = null;
     deck.busy = false;
     const el = $("#cardEl");
     el.style.transition = "none";
@@ -811,26 +828,38 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
     });
     $("#cardExp").classList.add("hidden");
     $("#cardExp").textContent = "";
-    $("#cardHint").textContent = "點選項作答 · 右滑＝我確定 · 左滑＝不熟";
-    $("#btnKnown").textContent = "確 定";
-    $("#btnKnown").disabled = false;
-    $("#btnUnknown").style.display = "";
-    $("#btnUnknown").disabled = false;
+    $("#cardHint").textContent = "點選項作答，或直接按「確定／不熟」自評";
+    tally();
+    paintRecord();
     $("#cardCount").textContent = `${String(deck.idx + 1).padStart(2, "0")} / ${String(deck.queue.length).padStart(2, "0")}`;
     $("#cardBar").style.width = (deck.idx / deck.queue.length * 100) + "%";
-    $("#cardTally").textContent = `確定 ${deck.right} · 不熟 ${deck.wrong}`;
   }
 
-  function markRight(q){
-    deck.right++;
-    if(weakCards[q.id]){ delete weakCards[q.id]; LS.set("tcm_cards_weak_v1", weakCards); }
-  }
-  function markWrong(q){
-    deck.wrong++;
-    weakCards[q.id] = 1; LS.set("tcm_cards_weak_v1", weakCards);
+  /* 記錄／改判：任何時候都能把這張卡改記為確定或不熟 */
+  function setRecord(kind){
+    const q = deck.queue[deck.idx];
+    if(!q || deck.record === kind) return;
+    if(deck.record === "ok") deck.right--;
+    if(deck.record === "no") deck.wrong--;
+    deck.record = kind;
+    if(kind === "ok"){
+      deck.right++;
+      if(weakCards[q.id]){ delete weakCards[q.id]; LS.set("tcm_cards_weak_v1", weakCards); }
+    }else{
+      deck.wrong++;
+      weakCards[q.id] = 1; LS.set("tcm_cards_weak_v1", weakCards);
+    }
+    tally();
+    paintRecord();
+    $("#cardHint").textContent = kind === "ok"
+      ? "已記為確定 · 覺得不熟可按「不熟」改判"
+      : "已記為不熟 · 想留著可按「確定」改判";
+    const st = kind === "ok" ? "#stampOk" : "#stampNo";
+    $(st).style.opacity = 1;
+    setTimeout(() => { $(st).style.opacity = 0; }, 820);
   }
 
-  /* 點選項：即時判對錯，對→確定、錯→不熟 */
+  /* 點選項：判對錯並預記，之後仍可按鈕改判 */
   function judge(i){
     const q = deck.queue[deck.idx];
     if(!q || deck.judged) return;
@@ -845,29 +874,8 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
     });
     $("#cardExp").textContent = (ok ? "答對　" : `答錯 · 正確答案 ${q.ans}　`) + q.exp;
     $("#cardExp").classList.remove("hidden");
-    $("#cardHint").textContent = ok ? "已列入「確定」· 可滑動或按下一張" : "已列入「不熟」· 可滑動或按下一張";
-    if(ok) markRight(q); else markWrong(q);
-    $("#cardTally").textContent = `確定 ${deck.right} · 不熟 ${deck.wrong}`;
-    const st = ok ? "#stampOk" : "#stampNo";
-    $(st).style.opacity = 1;
-    setTimeout(() => { $(st).style.opacity = 0; }, 900);
-    $("#btnUnknown").style.display = "none";
-    $("#btnKnown").textContent = "下 一 張";
-    $("#btnKnown").disabled = false;
-  }
-
-  /* 未作答就滑動：自我判定（右=確定、左=不熟） */
-  function decide(dir){
-    const q = deck.queue[deck.idx];
-    if(!q || deck.busy) return;
-    deck.busy = true;
-    if(dir === "ok") markRight(q); else markWrong(q);
-    $("#cardTally").textContent = `確定 ${deck.right} · 不熟 ${deck.wrong}`;
-    const el = $("#cardEl");
-    el.style.transition = "transform .34s cubic-bezier(.22,.61,.36,1), opacity .34s";
-    el.style.transform = `translateX(${dir === "ok" ? 140 : -140}%) rotate(${dir === "ok" ? 16 : -16}deg)`;
-    el.style.opacity = 0;
-    setTimeout(() => { deck.idx++; renderCard(); }, 300);
+    $("#cardHint").textContent = ok ? "已記為確定 · 覺得不熟可按「不熟」改判" : "已記為不熟 · 想留著可按「確定」改判";
+    setRecord(ok ? "ok" : "no");
   }
 
   function advance(){
@@ -880,17 +888,30 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
     setTimeout(() => { deck.idx++; renderCard(); }, 260);
   }
 
+  /* 滑動：未判定時＝自評並換下一張；已判定時＝換下一張 */
+  function decide(dir){
+    const q = deck.queue[deck.idx];
+    if(!q || deck.busy) return;
+    setRecord(dir === "ok" ? "ok" : "no");
+    deck.busy = true;
+    const el = $("#cardEl");
+    el.style.transition = "transform .34s cubic-bezier(.22,.61,.36,1), opacity .34s";
+    el.style.transform = `translateX(${dir === "ok" ? 140 : -140}%) rotate(${dir === "ok" ? 16 : -16}deg)`;
+    el.style.opacity = 0;
+    setTimeout(() => { deck.idx++; renderCard(); }, 300);
+  }
+
   function finishDeck(){
     $("#deckStage").classList.add("hidden");
     $(".deck-actions").style.display = "none";
     $("#btnCardQuit").classList.add("hidden");
+    $("#btnNextCard").classList.add("hidden");
     $("#cardDone").classList.remove("hidden");
     $("#doneTitle").textContent = (deck.right + deck.wrong) ? "這一輪複習完了" : "沒有卡片";
-    $("#doneLine").textContent = `答對 ${deck.right} 張 · 不熟 ${deck.wrong} 張（不熟的已記下，可再練）`;
+    $("#doneLine").textContent = `確定 ${deck.right} 張 · 不熟 ${deck.wrong} 張（不熟的已記下，可再練）`;
     $("#cardBar").style.width = "100%";
   }
 
-  /* 拖曳：未作答滑動＝自我判定；已作答滑動＝下一張 */
   let drag = { on: false, x0: 0, dx: 0, moved: false };
 
   $("#cardEl").addEventListener("pointerdown", e => {
@@ -915,9 +936,8 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
     const el = $("#cardEl");
     el.classList.remove("dragging");
     const th = 90;
-    const judgedNow = deck.judged;
     if(Math.abs(drag.dx) > th){
-      if(judgedNow){ advance(); return; }
+      if(deck.judged){ advance(); return; }
       decide(drag.dx > 0 ? "ok" : "no");
       return;
     }
@@ -929,17 +949,13 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
   $("#cardEl").addEventListener("pointerup", endDrag);
   $("#cardEl").addEventListener("pointercancel", endDrag);
 
-  $("#btnKnown").onclick = () => {
-    if(deck.judged){ advance(); return; }
-    decide("ok");
-  };
-  $("#btnUnknown").onclick = () => {
-    if(deck.judged) return;
-    decide("no");
-  };
+  $("#btnKnown").onclick = () => setRecord("ok");
+  $("#btnUnknown").onclick = () => setRecord("no");
+  $("#btnNextCard").onclick = () => advance();
   $("#btnCardQuit").onclick = () => {
     $("#cards").classList.add("hidden");
     $("#setup").classList.remove("hidden");
+    $("#btnNextCard").classList.remove("hidden");
     refreshInfo();
   };
   $("#btnCardBack").onclick = () => {
@@ -952,10 +968,12 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
     if(!list.length){ $("#doneLine").textContent = "目前沒有標為不熟的卡片。"; return; }
     deck.queue = shuffleCopy(list);
     deck.idx = 0; deck.right = 0; deck.wrong = 0;
+    deck.record = null; deck.judged = false;
     $("#cardDone").classList.add("hidden");
     $("#deckStage").classList.remove("hidden");
     $(".deck-actions").style.display = "";
     $("#btnCardQuit").classList.remove("hidden");
+    $("#btnNextCard").classList.remove("hidden");
     renderCard();
   };
 
@@ -966,9 +984,9 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
     const k = e.key.toUpperCase();
     const map = {"1":0,"2":1,"3":2,"4":3,"A":0,"B":1,"C":2,"D":3};
     if(map.hasOwnProperty(k) && !deck.judged){ e.preventDefault(); judge(map[k]); return; }
-    if(e.key === "ArrowRight"){ e.preventDefault(); deck.judged ? advance() : decide("ok"); }
-    else if(e.key === "ArrowLeft"){ e.preventDefault(); deck.judged ? advance() : decide("no"); }
-    else if(e.key === " " || e.key === "Enter"){ e.preventDefault(); if(deck.judged) advance(); }
+    if(e.key === "ArrowRight"){ e.preventDefault(); setRecord("ok"); }
+    else if(e.key === "ArrowLeft"){ e.preventDefault(); setRecord("no"); }
+    else if(e.key === " " || e.key === "Enter"){ e.preventDefault(); if(deck.record !== null) advance(); }
   });
 
   /* ── init ── */
