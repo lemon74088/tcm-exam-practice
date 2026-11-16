@@ -275,8 +275,10 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
         <p id="expText"></p>
       </div>
       <div class="footer-actions">
+        <button class="cta ghost" id="btnPrev">上一題</button>
         <button class="cta" id="btnNext">下一題</button>
-        <span class="note">按 1–4 作答 · Enter 前進</span>
+        <button class="cta ghost" id="btnQuit">結束本回</button>
+        <span class="note">按 1–4 作答 · Enter 前進 · ← 回上一題</span>
       </div>
     </div>
   </section>
@@ -378,7 +380,7 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
     limit: 0,
     shuffle: true,
     wrongOnly: false,
-    queue: [], idx: 0, answered: false, results: []
+    queue: [], idx: 0, answered: false, results: [], picks: []
   };
   let wrongPool = LS.get("tcm_wrong_v1", {});   // {id: times}
 
@@ -479,7 +481,7 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
     }
     if(state.limit) pool = pool.slice(0, state.limit);
     if(!pool.length) return;
-    state.queue = pool; state.idx = 0; state.results = [];
+    state.queue = pool; state.idx = 0; state.results = []; state.picks = [];
     $("#setup").classList.add("hidden");
     $("#result").classList.add("hidden");
     $("#quiz").classList.remove("hidden");
@@ -488,11 +490,29 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
   };
 
   /* ── 作答 ── */
+  function paintAnswered(q, i){
+    const right = "ABCD".indexOf(q.ans);
+    const ok = i === right;
+    $("#opts").querySelectorAll(".opt").forEach((el,k)=>{
+      el.classList.add("done");
+      if(k === right) el.classList.add("right");
+      if(k === i && !ok) el.classList.add("wrong");
+    });
+    const v = $("#verdict");
+    v.className = "verdict " + (ok ? "ok" : "no");
+    v.textContent = ok ? "答對" : `答錯 · 正確答案 ${q.ans}`;
+    $("#expText").textContent = q.exp;
+    $("#explain").classList.add("show");
+    $("#btnNext").disabled = false;
+    $("#btnNext").style.opacity = 1;
+    return ok;
+  }
+
   function renderQuestion(){
     const q = state.queue[state.idx];
     state.answered = false;
     $("#qcount").textContent = `${String(state.idx+1).padStart(2,"0")} / ${String(state.queue.length).padStart(2,"0")}`;
-    $("#bar").style.width = ((state.idx) / state.queue.length * 100) + "%";
+    $("#bar").style.width = ((state.picks.filter(v => v !== undefined).length) / state.queue.length * 100) + "%";
     const acc = state.results.length ? Math.round(state.results.filter(r=>r.ok).length / state.results.length * 100) : null;
     $("#accLive").textContent = acc === null ? "正確率 —" : `正確率 ${acc}%`;
 
@@ -512,9 +532,15 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
       el.onclick = () => answer(Number(el.dataset.i));
     });
     $("#explain").classList.remove("show");
+    $("#verdict").textContent = "";
+    $("#expText").textContent = "";
     $("#btnNext").textContent = state.idx === state.queue.length - 1 ? "看 成 績" : "下 一 題";
     $("#btnNext").disabled = true;
     $("#btnNext").style.opacity = .45;
+    $("#btnPrev").disabled = state.idx === 0;
+    $("#btnPrev").style.opacity = state.idx === 0 ? .35 : 1;
+    /* 回頭題：直接還原先前作答樣貌（不重複計分） */
+    if(state.picks[state.idx] !== undefined){ state.answered = true; paintAnswered(q, state.picks[state.idx]); }
   }
 
   let lastQueue = [];
@@ -523,22 +549,10 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
     if(state.answered) return;
     const q = state.queue[state.idx];
     state.answered = true;
-    const right = "ABCD".indexOf(q.ans);
-    const ok = i === right;
     lastQueue = state.queue.slice(state.idx, state.idx + 5);
+    const ok = paintAnswered(q, i);
 
-    $("#opts").querySelectorAll(".opt").forEach((el,k)=>{
-      el.classList.add("done");
-      if(k === right) el.classList.add("right");
-      if(k === i && !ok) el.classList.add("wrong");
-    });
-
-    const v = $("#verdict");
-    v.className = "verdict " + (ok ? "ok" : "no");
-    v.textContent = ok ? "答對" : `答錯 · 正確答案 ${q.ans}`;
-    $("#expText").textContent = q.exp;
-    $("#explain").classList.add("show");
-
+    state.picks[state.idx] = i;
     state.results.push({id:q.id, ch:q.ch, ok});
     if(!ok) wrongPool[q.id] = (wrongPool[q.id] || 0) + 1;
     else if(wrongPool[q.id]) delete wrongPool[q.id];
@@ -547,9 +561,6 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
     const acc = Math.round(state.results.filter(r=>r.ok).length / state.results.length * 100);
     $("#accLive").textContent = `正確率 ${acc}%`;
     $("#bar").style.width = ((state.idx + 1) / state.queue.length * 100) + "%";
-
-    $("#btnNext").disabled = false;
-    $("#btnNext").style.opacity = 1;
   }
 
   $("#btnNext").onclick = () => {
@@ -558,10 +569,21 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
     state.idx++; renderQuestion();
   };
 
+  $("#btnPrev").onclick = () => {
+    if(state.idx === 0) return;
+    state.idx--; renderQuestion();
+  };
+
+  $("#btnQuit").onclick = () => {
+    if(!state.results.length){ $("#quiz").classList.add("hidden"); $("#setup").classList.remove("hidden"); return; }
+    showResult();
+  };
+
   document.addEventListener("keydown", e=>{
     if($("#quiz").classList.contains("hidden")) return;
     const q = state.queue[state.idx];
     if(!q) return;
+    if(e.key === "ArrowLeft"){ e.preventDefault(); $("#btnPrev").click(); return; }
     const k = e.key.toUpperCase();
     const map = {"1":0,"2":1,"3":2,"4":3,"A":0,"B":1,"C":2,"D":3};
     if(map.hasOwnProperty(k) && !state.answered){ answer(map[k]); }
