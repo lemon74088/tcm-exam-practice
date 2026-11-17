@@ -97,7 +97,23 @@ const CFG = [
     rv: i => "具有「" + i + "」之特點或治法的婦科病證是：",
     ex: null,
     expF: f => f.n + "：" + f.g + "。" + f.i,
-    expR: f => "正確為 " + f.n + "：" + f.i }
+    expR: f => "正確為 " + f.n + "：" + f.i },
+  /* 中藥學總論補強：獨立檔，不動 10-gen-materia.js 的既有題號 */
+  { sub: "materia", prefix: "ZY-T", file: "20-gen-materia-total.js", src: "materia-total",
+    lbl: { g: "內涵", i: "要點" },
+    fw: n => "中藥學總論中「" + n + "」是指：",
+    rv: i => "下列說明「" + i + "」所對應的中藥學總論概念是：",
+    ex: null,
+    expF: f => f.n + "：" + f.g + "。" + (f.i || ""),
+    expR: f => "正確為 " + f.n + "：" + f.g },
+  /* 中藥基本理論（本草備要·藥性總義條理）：第三檔 */
+  { sub: "materia", prefix: "ZY-U", file: "21-gen-materia-basic.js", src: "materia-total2",
+    lbl: { g: "內容", i: "要點" },
+    fw: n => "中藥基本理論中「" + n + "」是指：",
+    rv: i => "本草論「" + i + "」，所對應的藥性理論是：",
+    ex: null,
+    expF: f => f.n + "：" + f.g + "。" + (f.i || ""),
+    expR: f => "正確為 " + f.n + "：" + f.g }
 ];
 
 let total = 0;
