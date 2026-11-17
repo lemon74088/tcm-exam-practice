@@ -137,6 +137,28 @@ const CFG = [
     rv: i => "下列說明「" + i + "」所對應的方劑或原則是：",
     ex: null,
     expF: f => f.n + "：" + f.g + "。" + (f.i || ""),
+    expR: f => "正確為 " + f.n + "：" + f.g },
+  /* 針灸學三張薄章節補強：總論／治療總論／治療各論 */
+  { sub: "acupuncture", prefix: "ZJ-T", file: "25-gen-acu-total.js", src: "acu-total",
+    lbl: { g: "內容", i: "要點" },
+    fw: n => "針灸學經絡腧穴總論中「" + n + "」是指：",
+    rv: i => "下列說明「" + i + "」所對應的經絡腧穴概念是：",
+    ex: null,
+    expF: f => f.n + "：" + f.g + "。" + (f.i || ""),
+    expR: f => "正確為 " + f.n + "：" + f.g },
+  { sub: "acupuncture", prefix: "ZJ-U", file: "26-gen-acu-theory.js", src: "acu-theory",
+    lbl: { g: "內容", i: "要點" },
+    fw: n => "針灸治療總論中「" + n + "」是指：",
+    rv: i => "下列說明「" + i + "」所對應的針灸治療原則是：",
+    ex: null,
+    expF: f => f.n + "：" + f.g + "。" + (f.i || ""),
+    expR: f => "正確為 " + f.n + "：" + f.g },
+  { sub: "acupuncture", prefix: "ZJ-V", file: "27-gen-acu-spec.js", src: "acu-spec",
+    lbl: { g: "取穴", i: "加減" },
+    fw: n => "針灸治療「" + n + "」的取穴是：",
+    rv: i => "下列「" + i + "」所屬病證是：",
+    ex: null,
+    expF: f => f.n + "：" + f.g + "（" + f.i + "）",
     expR: f => "正確為 " + f.n + "：" + f.g }
 ];
 
