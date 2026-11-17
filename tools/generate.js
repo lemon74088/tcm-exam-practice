@@ -113,6 +113,30 @@ const CFG = [
     rv: i => "本草論「" + i + "」，所對應的藥性理論是：",
     ex: null,
     expF: f => f.n + "：" + f.g + "。" + (f.i || ""),
+    expR: f => "正確為 " + f.n + "：" + f.g },
+  /* 方劑學總論補強：獨立檔，不動 11-gen-formula.js 的既有題號 */
+  { sub: "formula", prefix: "FJ-T", file: "22-gen-formula-total.js", src: "formula-total",
+    lbl: { g: "內涵", i: "要點" },
+    fw: n => "方劑學總論中「" + n + "」是指：",
+    rv: i => "下列說明「" + i + "」所對應的方劑學概念是：",
+    ex: null,
+    expF: f => f.n + "：" + f.g + "。" + (f.i || ""),
+    expR: f => "正確為 " + f.n + "：" + f.g },
+  /* 方劑學「消食與其他」應用原則與配伍特點（另池） */
+  { sub: "formula", prefix: "FJ-V", file: "24-gen-formula-misc2.js", src: "formula-misc2",
+    lbl: { g: "要點", i: "補充" },
+    fw: n => "關於「" + n + "」，正確的是：",
+    rv: i => "下列說明「" + i + "」所對應的方劑學原則或特點是：",
+    ex: null,
+    expF: f => f.n + "：" + f.g + "。" + (f.i || ""),
+    expR: f => "正確為 " + f.n + "：" + f.g },
+  /* 方劑學「消食與其他」方劑本體補強 */
+  { sub: "formula", prefix: "FJ-U", file: "23-gen-formula-misc.js", src: "formula-misc",
+    lbl: { g: "功用", i: "主治與要點" },
+    fw: n => "方劑「" + n + "」的功用是：",
+    rv: i => "下列說明「" + i + "」所對應的方劑或原則是：",
+    ex: null,
+    expF: f => f.n + "：" + f.g + "。" + (f.i || ""),
     expR: f => "正確為 " + f.n + "：" + f.g }
 ];
 
