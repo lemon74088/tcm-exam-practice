@@ -167,6 +167,14 @@ const CFG = [
     rv: i => "下列說明「" + i + "」所對應的斷病綱目是：",
     ex: null,
     expF: f => f.n + "：" + f.g + "。" + (f.i || ""),
+    expR: f => "正確為 " + f.n + "：" + f.g },
+  /* 針灸斷病法則：辨察要點與判斷結論（第二檔，題幹模板不同以免重複） */
+  { sub: "acupuncture", prefix: "ZJ-X", file: "29-gen-acu-duanbing2.js", src: "acu-duanbing2",
+    lbl: { g: "要點", i: "補充" },
+    fw: n => "針灸斷病時，「" + n + "」的辨察要點是：",
+    rv: i => "下列說明「" + i + "」所指的斷病要點是：",
+    ex: null,
+    expF: f => f.n + "：" + f.g + "。" + (f.i || ""),
     expR: f => "正確為 " + f.n + "：" + f.g }
 ];
 
