@@ -159,6 +159,14 @@ const CFG = [
     rv: i => "下列「" + i + "」所屬病證是：",
     ex: null,
     expF: f => f.n + "：" + f.g + "（" + f.i + "）",
+    expR: f => "正確為 " + f.n + "：" + f.g },
+  /* 針灸學．新增單元：針灸斷病法則（周左宇） */
+  { sub: "acupuncture", prefix: "ZJ-W", file: "28-gen-acu-duanbing.js", src: "acu-duanbing",
+    lbl: { g: "內容", i: "要點" },
+    fw: n => "《針灸斷病法則》中「" + n + "」是指：",
+    rv: i => "下列說明「" + i + "」所對應的斷病綱目是：",
+    ex: null,
+    expF: f => f.n + "：" + f.g + "。" + (f.i || ""),
     expR: f => "正確為 " + f.n + "：" + f.g }
 ];
 
