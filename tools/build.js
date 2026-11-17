@@ -50,9 +50,10 @@ fs.writeFileSync(
 
 /* ---- 匯出 CSV（UTF-8 BOM，Excel / 飛書可直接開） ---- */
 const esc = v => `"${String(v).replace(/"/g, '""')}"`;
-const head = ["題號","科目","章節","題型","難度","題幹","A","B","C","D","答案","解析","標籤"];
+const head = ["題號","科目","章節","題型","難度","題幹","A","B","C","D","答案","解析","其他選項辨析","標籤"];
+const whyText = q => (q.why || []).map((w, i) => w ? "ABCD"[i] + "：" + w : "").filter(Boolean).join("｜");
 const rows = Q.map(q => [
-  q.id, q.sub, q.ch, q.type, q.diff, q.stem, ...q.opts, q.ans, q.exp, q.tags.join("／")
+  q.id, q.sub, q.ch, q.type, q.diff, q.stem, ...q.opts, q.ans, q.exp, whyText(q), q.tags.join("／")
 ].map(esc).join(","));
 fs.writeFileSync(
   path.join(ROOT, "exports", "題庫_匯總.csv"),

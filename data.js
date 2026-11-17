@@ -2,7 +2,7 @@
    題目依科目拆在 data/NN-*.js，各自 push 進 TCM_QUESTIONS。
    新增科目：於 TCM_SUBJECTS 登錄 → 建 data/NN-xxx.js → index.html 加 script → CHAPTER_MAP 加章節順序。 */
 window.TCM_SCHEMA = "tcm-bank-v1";
-window.TCM_UPDATED = "2026-11-16";
+window.TCM_UPDATED = "2026-11-17";
 
 window.TCM_SUBJECTS = [
   { id: "diagnosis",  name: "中醫診斷學", open: true,  base: "十二五／十五五 共通", n: 0 },

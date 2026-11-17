@@ -1,6 +1,7 @@
 /* 由知識點表批量產生題目：node tools/generate.js
    產出 data/1N-gen-*.js（每次重跑覆寫，不動手寫題庫）
-   規則：一知識點一題、選項不重複、描述相同者視為歧義略過、答案位置以種子打散 */
+   規則：一知識點一題、選項不重複、描述相同者視為歧義略過、答案位置以種子打散
+   每題附 why[]：與 opts 對齊，干擾項寫「該項其實屬於哪個知識點」，正解為 null */
 const fs = require("fs");
 const path = require("path");
 
@@ -16,7 +17,8 @@ function shuffle(arr, seed) {
 }
 
 /* 挑干擾項：dir="same" 同章優先（貼近真題難度），dir="diff" 他章優先（避免同章近義）
-   getVal 決定要比對的值（正向比描述、反向比名稱），同一值只出現一次 */
+   getVal 決定要比對的值（正向比描述、反向比名稱），同一值只出現一次
+   回傳 [{ v, f }]：v 選項文字、f 來源知識點（用於逐項解析） */
 function pickVals(rows, self, seed, t, dir, need, getVal) {
   const sameT = rows.filter(f => f.t === t), diffT = rows.filter(f => f.t !== t);
   const pool = shuffle(dir === "same" ? sameT.concat(diffT) : diffT.concat(sameT), seed);
@@ -26,61 +28,71 @@ function pickVals(rows, self, seed, t, dir, need, getVal) {
     if (f.n === self.n) continue;
     const v = getVal(f);
     if (!v || seen.has(v)) continue;
-    seen.add(v); out.push(v);
+    seen.add(v); out.push({ v, f });
   }
   return out;
 }
 
+/* lbl：該科各欄位在題目裡叫什麼（用來寫逐項解析） */
 const CFG = [
   { sub: "diagnosis", prefix: "DX", file: "17-gen-diagnosis.js", src: "diagnosis",
+    lbl: { g: "表現特點", i: "主病意義" },
     fw: n => "中醫診斷學中「" + n + "」是指：",
     rv: i => "「" + i + "」是哪一症候或體徵的特點？",
     ex: null,
     expF: f => f.n + "：" + f.g + "。" + (f.i || ""),
     expR: f => "正確為 " + f.n + "：" + f.g },
   { sub: "internal", prefix: "NK", file: "18-gen-internal.js", src: "internal",
+    lbl: { g: "主症特點", i: "治法" },
     fw: n => "「" + n + "」的主症特點是：",
     rv: i => "「" + i + "」對應的內科證型是：",
     ex: null,
     expF: f => f.n + "：" + f.g + "。治法：" + (f.i || ""),
     expR: f => "正確為 " + f.n + "：" + f.g },
   { sub: "basic", prefix: "JC", file: "16-gen-basic.js", src: "basic",
+    lbl: { g: "內涵", i: "補充說明" },
     fw: n => "中醫基礎理論中「" + n + "」的內涵是：",
     rv: i => "下列說明「" + i + "」所對應的概念是：",
     ex: null,
     expF: f => f.n + "：" + f.g + "。" + (f.i || ""),
     expR: f => "正確為 " + f.n + "：" + f.g },
   { sub: "materia", prefix: "ZY", file: "10-gen-materia.js", src: "materia",
+    lbl: { g: "功效", i: "主治", s: "用法" },
     fw: n => "中藥「" + n + "」的功效是：",
     rv: i => "治療「" + i + "」宜選用的藥物是：",
     ex: n => "中藥「" + n + "」的用法或使用注意是：",
     expF: f => f.n + "：" + f.g + "。主治：" + (f.i || ""),
-    expR: f => "正確為 " + f.n + "，功用：" + f.g },
+    expR: f => "正確為 " + f.n + "，功效：" + f.g },
   { sub: "formula", prefix: "FJ", file: "11-gen-formula.js", src: "formula",
+    lbl: { g: "功用", i: "主治", s: "組成" },
     fw: n => "方劑「" + n + "」的功用是：",
     rv: i => "主治「" + i + "」的方劑是：",
     ex: n => "方劑「" + n + "」的組成是：",
     expF: f => f.n + "：" + f.g + "。主治：" + (f.i || "") + "。組成：" + (f.s || ""),
     expR: f => "正確為 " + f.n + "，功用：" + f.g },
   { sub: "acupuncture", prefix: "ZJ", file: "12-gen-acupuncture.js", src: "acupuncture",
+    lbl: { g: "定位", i: "主治", s: "特定穴屬性" },
     fw: n => "腧穴「" + n + "」的定位是：",
     rv: i => "針灸臨床主治「" + i + "」的腧穴是：",
     ex: n => "腧穴「" + n + "」的特定穴屬性（或操作注意）是：",
     expF: f => f.n + "：" + f.g + (f.s ? "；" + f.s : ""),
     expR: f => "正確為 " + f.n + "。主治：" + f.i },
   { sub: "surgery", prefix: "WK", file: "13-gen-surgery.js", src: "surgery",
+    lbl: { g: "臨床特點", i: "治法" },
     fw: n => "外科「" + n + "」的臨床特點是：",
     rv: i => "具有「" + i + "」之治法或代表方的外科病證是：",
     ex: null,
     expF: f => f.n + "：" + f.g + "。" + f.i,
     expR: f => "正確為 " + f.n + "：" + f.i },
   { sub: "pediatrics", prefix: "EK", file: "14-gen-pediatrics.js", src: "pediatrics",
+    lbl: { g: "要點", i: "治法" },
     fw: n => "兒科「" + n + "」的要點是：",
     rv: i => "具有「" + i + "」之特點或治法的兒科病證是：",
     ex: null,
     expF: f => f.n + "：" + f.g + "。" + f.i,
     expR: f => "正確為 " + f.n + "：" + f.i },
   { sub: "gynecology", prefix: "FK", file: "15-gen-gynecology.js", src: "gynecology",
+    lbl: { g: "要點", i: "治法" },
     fw: n => "婦科「" + n + "」的要點是：",
     rv: i => "具有「" + i + "」之特點或治法的婦科病證是：",
     ex: null,
@@ -104,13 +116,22 @@ CFG.forEach(cfg => {
     .filter(f => f[key] && (!onlyPoint || f.k !== "case"))
     .map(f => ({ n: f.n, t: f.t, k: f.k || "", v: f[key], g: f.g, i: f.i }));
 
-  function push(stem, correct, distractors, meta, exp, tag) {
-    if (distractors.length < 3) { skipped++; return; }
-    const opts = shuffle([correct].concat(distractors.slice(0, 3)), stem + correct);
+  /* correct：正解文字；dist：干擾項 [{v,f}]；noteOf：把來源知識點寫成一句辨析 */
+  function push(stem, correct, dist, meta, exp, tag, noteOf) {
+    if (dist.length < 3) { skipped++; return; }
+    const picked = dist.slice(0, 3);
+    const opts = shuffle([correct].concat(picked.map(d => d.v)), stem + correct);
+    const why = opts.map(o => {
+      if (o === correct) return null;
+      const d = picked.find(x => x.v === o);
+      return d && noteOf ? noteOf(d.f) : null;
+    });
     items.push({
       id: cfg.prefix + "-G" + String(++seqN).padStart(3, "0"),
       sub: cfg.sub, ch: meta.t, type: "A1", diff: meta.diff || 2,
-      stem: stem, opts: opts, ans: "ABCD"[opts.indexOf(correct)], exp: exp, tags: [meta.t, tag]
+      stem: stem, opts: opts, ans: "ABCD"[opts.indexOf(correct)], exp: exp,
+      why: why.some(Boolean) ? why : undefined,
+      tags: [meta.t, tag]
     });
   }
 
@@ -118,7 +139,7 @@ CFG.forEach(cfg => {
   const grow = rows("g", isAcu);
   grow.forEach(f => {
     push(cfg.fw(f.n), f.v, pickVals(grow, f, cfg.prefix + f.n + "G", f.t, "same", 3, x => x.v),
-      { t: f.t }, cfg.expF(f), "內涵定位");
+      { t: f.t }, cfg.expF(f), "內涵定位", g => "此為「" + g.n + "」的" + cfg.lbl.g);
   });
 
   /* 反向：敘述 → 名（針灸主治多重複，不做反向，避免多個穴位皆可選） */
@@ -127,7 +148,8 @@ CFG.forEach(cfg => {
     irow.forEach(f => {
       if (cnt[f.v] > 1) { skipped++; return; }
       const names = pickVals(irow, f, cfg.prefix + f.n + "R", f.t, "diff", 3, x => x.n);
-      push(cfg.rv(f.v), f.n, names, { t: f.t }, cfg.expR(f), "反向對應");
+      push(cfg.rv(f.v), f.n, names, { t: f.t }, cfg.expR(f), "反向對應",
+        g => "此為「" + g.n + "」的" + cfg.lbl.i + "：" + g.v);
     });
   }
 
@@ -137,7 +159,8 @@ CFG.forEach(cfg => {
     srow.forEach(f => {
       if (cnt[f.v] > 1) { skipped++; return; }
       push(cfg.ex(f.n), f.v, pickVals(srow, f, cfg.prefix + f.n + "S", f.t, "same", 3, x => x.v),
-        { t: f.t, diff: 3 }, f.n + "：" + f.v, "屬性組成");
+        { t: f.t, diff: 3 }, f.n + "：" + f.v, "屬性組成",
+        g => "此為「" + g.n + "」的" + cfg.lbl.s);
     });
   }
 
@@ -147,7 +170,8 @@ CFG.forEach(cfg => {
     const crows = cases.map(f => ({ n: f.n, t: f.t, k: "case", v: f.g, g: f.g, i: f.i }));
     cases.forEach(f => {
       push("針灸治療「" + f.n + "」的取穴是：", f.g, pickVals(crows, { n: f.n, v: f.g }, "ZJ" + f.n, f.t, "same", 3, x => x.v),
-        { t: f.t, diff: 3 }, f.n + "：" + f.g + "（" + f.i + "）", "治療取穴");
+        { t: f.t, diff: 3 }, f.n + "：" + f.g + "（" + f.i + "）", "治療取穴",
+        g => "此為「" + g.n + "」病的取穴");
     });
   }
 

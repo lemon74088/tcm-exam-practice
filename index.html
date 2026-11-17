@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>中醫考題練習 · 題庫</title>
 <style>
 :root{
@@ -24,6 +24,9 @@
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{height:100%}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+button{touch-action:manipulation}
+body{overscroll-behavior-y:contain}
 body{
   margin:0;background:var(--ink);color:var(--paper);font-family:var(--serif);
   -webkit-font-smoothing:antialiased;line-height:1.7;letter-spacing:.02em;
@@ -177,6 +180,9 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
 .verdict{font-size:13.5px;letter-spacing:.16em;margin-bottom:11px;font-weight:600}
 .verdict.ok{color:var(--ok)}
 .verdict.no{color:var(--bad)}
+.explain .why{margin-top:12px;padding-top:10px;border-top:1px dashed var(--line);display:flex;flex-direction:column;gap:6px}
+.explain .why .w{display:flex;gap:9px;font-size:13.5px;line-height:1.8;color:#cbc2b1}
+.explain .why .w b{flex:none;font-family:var(--serif);color:var(--gold);font-weight:600}
 
 /* ── result ── */
 .score-wrap{display:flex;gap:28px;align-items:center;flex-wrap:wrap}
@@ -230,7 +236,17 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
 .card .stemc{font-size:clamp(17px,3vw,26px);letter-spacing:.04em;line-height:1.65;color:#f6efe2;text-align:center;text-wrap:balance}
 .card .optc{display:flex;flex-direction:column;gap:9px;margin-top:4px}
 .card .optc .opt{font-size:14px;padding:11px 13px}
-.card .expc{font-size:13px;line-height:1.85;color:var(--paper-dim);border-top:1px dashed var(--line);padding-top:11px;text-align:center;max-height:36%;overflow-y:auto}
+/* 作答後：字級與選項收緊，解析整段展開（內容超出時卡內可捲動，不再切字） */
+.card.judged{justify-content:flex-start;overflow-y:auto;scrollbar-width:none}
+.card.judged::-webkit-scrollbar{display:none}
+.card.judged .stemc{font-size:clamp(15px,2.5vw,21px)}
+.card.judged .optc .opt{font-size:12.8px;padding:8px 12px}
+.card.judged .optc{gap:7px}
+.card .expc{font-size:13px;line-height:1.85;color:var(--paper-dim);border-top:1px dashed var(--line);padding-top:11px;text-align:center}
+.card .expc p{margin:0}
+.card .expc .why{margin-top:9px;display:flex;flex-direction:column;gap:5px;text-align:left}
+.card .expc .why .w{display:flex;gap:8px;font-size:12.5px;line-height:1.7;color:#bdb5a6}
+.card .expc .why .w b{flex:none;font-family:var(--serif);color:var(--gold)}
 .card .hintflip{font-size:11.5px;color:rgba(200,169,106,.7);letter-spacing:.14em;text-align:center}
 .card .stamp{
   position:absolute;top:22px;padding:6px 12px;border-radius:8px;font-size:13px;letter-spacing:.14em;
@@ -323,6 +339,7 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
         <div class="verdict" id="verdict"></div>
         <div class="h">解析</div>
         <p id="expText"></p>
+        <div class="why" id="whyList" style="display:none"></div>
       </div>
       <div class="footer-actions">
         <button class="cta ghost" id="btnPrev">上一題</button>
@@ -434,6 +451,7 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
 <script src="data/16-gen-basic.js"></script>
 <script src="data/17-gen-diagnosis.js"></script>
 <script src="data/18-gen-internal.js"></script>
+<script src="data/19-gen-extra.js"></script>
 <script>
 (function(){
   "use strict";
@@ -444,10 +462,40 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
   const SUBJECTS = window.TCM_SUBJECTS || [];
   const ALL = window.TCM_QUESTIONS || [];
 
+  /* 逐項辨析：生成題自帶 why[]（該干擾項其實屬於哪個知識點）；
+     手寫題若某選項曾在別題是正解，就標出它屬於哪個考點 */
+  const ENT_BY_ANS = new Map();
+  ALL.forEach(x => {
+    const t = x.opts["ABCD".indexOf(x.ans)];
+    if(!t) return;
+    const m = x.stem.match(/[「『]([^」』]+)[」』]/);
+    if(m && !ENT_BY_ANS.has(t)) ENT_BY_ANS.set(t, m[1]);
+  });
+  function whyOf(q){
+    const right = "ABCD".indexOf(q.ans);
+    const arr = (q.why && q.why.length === q.opts.length) ? q.why.slice() : q.opts.map(() => null);
+    const topic = (q.stem.match(/[「『]([^」』]+)[」』]/) || [,""])[1];
+    let any = false;
+    arr.forEach((w, i) => {
+      if(i === right){ arr[i] = null; return; }
+      if(w){ any = true; return; }
+      const ent = ENT_BY_ANS.get(q.opts[i]);
+      if(ent && ent !== topic){
+        arr[i] = "此為「" + ent + "」的解題要點，非本題所問";
+        any = true;
+      }
+    });
+    return any ? arr : null;
+  }
+  function whyHTML(why){
+    if(!why) return "";
+    return why.map((w, i) => w ? `<div class="w"><b>${"ABCD"[i]}</b><span>${w}</span></div>` : "").join("");
+  }
+
   const CHAPTER_MAP = {
     diagnosis: ["緒論","望診","舌診","聞診","問診","切診","八綱辨證","病性辨證","病位辨證","診斷思維與應用","醫案與病歷"],
     internal: ["肺系病證","心腦系病證","脾胃系病證","肝膽系病證","腎系病證","氣血津液病證","肢體經絡病證"],
-    basic: ["緒論","哲學基礎","藏象","精氣血津液","經絡","體質","病因","病機","防治原則","養生"],
+    basic: ["緒論","哲學基礎","藏象","精氣血津液","經絡","體質","病因","病機","防治原則","養生","古籍原文與應用","典籍與醫家"],
     materia: ["總論","解表藥","清熱藥","瀉下與祛風濕藥","化濕與利水滲濕藥","溫裡與理氣藥","消食與驅蟲藥","止血與活血化瘀藥","化痰止咳平喘藥","安神與平肝息風藥","開竅與補虛藥","收澀與其他"],
     formula: ["總論","解表劑","瀉下與和解劑","清熱與祛暑劑","溫裡與補益劑","固澀與安神劑","理氣與理血劑","治風與治燥劑","祛濕與祛痰劑","消食與其他"],
     acupuncture: ["經絡腧穴總論","腧穴各論","刺灸法","針灸治療總論","針灸治療各論"],
@@ -596,6 +644,10 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
     v.className = "verdict " + (ok ? "ok" : "no");
     v.textContent = ok ? "答對" : `答錯 · 正確答案 ${q.ans}`;
     $("#expText").textContent = q.exp;
+    const why = whyOf(q);
+    const wl = $("#whyList");
+    if(why){ wl.innerHTML = whyHTML(why); wl.style.display = "flex"; }
+    else { wl.innerHTML = ""; wl.style.display = "none"; }
     $("#explain").classList.add("show");
     $("#btnNext").disabled = false;
     $("#btnNext").style.opacity = 1;
@@ -628,6 +680,8 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
     $("#explain").classList.remove("show");
     $("#verdict").textContent = "";
     $("#expText").textContent = "";
+    $("#whyList").innerHTML = "";
+    $("#whyList").style.display = "none";
     $("#btnNext").textContent = state.idx === state.queue.length - 1 ? "看 成 績" : "下 一 題";
     $("#btnNext").disabled = true;
     $("#btnNext").style.opacity = .45;
@@ -810,6 +864,8 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
     el.style.transform = "translateX(0) rotate(0deg)";
     el.style.opacity = 1;
     el.classList.remove("dragging");
+    el.classList.remove("judged");
+    el.scrollTop = 0;
     $("#stampOk").style.opacity = 0;
     $("#stampNo").style.opacity = 0;
     $("#cardCh").textContent = q.ch;
@@ -872,8 +928,12 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
       if(k === i && !ok) el.classList.add("wrong");
       el.onclick = null;
     });
-    $("#cardExp").textContent = (ok ? "答對　" : `答錯 · 正確答案 ${q.ans}　`) + q.exp;
+    const why = whyOf(q);
+    $("#cardExp").innerHTML =
+      `<p>${(ok ? "答對　" : `答錯 · 正確答案 ${q.ans}　`) + q.exp}</p>` +
+      (why ? `<div class="why">${whyHTML(why)}</div>` : "");
     $("#cardExp").classList.remove("hidden");
+    $("#cardEl").classList.add("judged");
     $("#cardHint").textContent = ok ? "已記為確定 · 覺得不熟可按「不熟」改判" : "已記為不熟 · 想留著可按「確定」改判";
     setRecord(ok ? "ok" : "no");
   }
