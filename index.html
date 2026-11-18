@@ -219,6 +219,16 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
 .fade-in{animation:fadeUp .55s cubic-bezier(.22,.61,.36,1) both}
 @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
 
+/* 左右滑動換題的過場 */
+#quiz.sw-out-l{animation:swOutL .16s ease-out both}
+#quiz.sw-in-r{animation:swInR .26s cubic-bezier(.22,.61,.36,1) both}
+#quiz.sw-out-r{animation:swOutR .16s ease-out both}
+#quiz.sw-in-l{animation:swInL .26s cubic-bezier(.22,.61,.36,1) both}
+@keyframes swOutL{to{opacity:.35;transform:translateX(-34px)}}
+@keyframes swInR{from{opacity:.35;transform:translateX(34px)}to{opacity:1;transform:none}}
+@keyframes swOutR{to{opacity:.35;transform:translateX(34px)}}
+@keyframes swInL{from{opacity:.35;transform:translateX(-34px)}to{opacity:1;transform:none}}
+
 /* ── 複習卡片 ── */
 .deck-stage{position:relative;margin:18px 0 6px;height:min(62vh,520px);perspective:1200px;touch-action:pan-y}
 .deck-stage .ghost-card{
@@ -353,7 +363,7 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
         <button class="cta ghost" id="btnPrev">上一題</button>
         <button class="cta" id="btnNext">下一題</button>
         <button class="cta ghost" id="btnQuit">結束本回</button>
-        <span class="note">按 1–4 作答 · Enter 前進 · ← 回上一題</span>
+        <span class="note">1–4 或點選作答 · 左右滑動換題 · Enter 前進 · ← 回上一題</span>
       </div>
     </div>
   </section>
@@ -787,6 +797,38 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
     if(map.hasOwnProperty(k) && !state.answered){ answer(map[k]); }
     else if((e.key === "Enter" || e.key === " ") && state.answered){ e.preventDefault(); $("#btnNext").click(); }
   });
+
+  /* ── 手勢：試題頁左右滑動換題 ── */
+  (function swipeNav(){
+    const el = $("#quiz");
+    let x0 = null, y0 = null, t0 = 0, moved = false;
+    el.addEventListener("touchstart", e => {
+      if(e.touches.length !== 1) return;
+      x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; t0 = Date.now(); moved = false;
+    }, {passive:true});
+    el.addEventListener("touchmove", e => {
+      if(x0 === null || e.touches.length !== 1) return;
+      const dx = e.touches[0].clientX - x0, dy = e.touches[0].clientY - y0;
+      if(Math.abs(dx) > 24 && Math.abs(dx) > Math.abs(dy)) moved = true;
+    }, {passive:true});
+    el.addEventListener("touchend", e => {
+      if(x0 === null) return;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - x0, dy = t.clientY - y0;
+      x0 = null;
+      if(Date.now() - t0 > 700) return;
+      if(!moved || Math.abs(dx) < 56 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+      const toNext = dx < 0;
+      el.classList.add(toNext ? "sw-out-l" : "sw-out-r");
+      setTimeout(() => {
+        el.classList.remove("sw-out-l", "sw-out-r");
+        if(toNext){ const b = $("#btnNext"); if(!b.disabled) b.click(); }
+        else { const b = $("#btnPrev"); if(!b.disabled) b.click(); }
+        el.classList.add(toNext ? "sw-in-r" : "sw-in-l");
+        setTimeout(() => el.classList.remove("sw-in-r", "sw-in-l"), 260);
+      }, 150);
+    }, {passive:true});
+  })();
 
   /* ── 成績 ── */
   function showResult(){
