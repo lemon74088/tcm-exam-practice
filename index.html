@@ -311,6 +311,7 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
         <button class="toggle" data-limit="50">50 題</button>
         <span style="width:14px"></span>
         <button class="toggle" id="btnShuffle">隨機排序</button>
+        <button class="toggle" id="btnFresh">優先未練過</button>
         <button class="toggle" id="btnWrongOnly">只練錯題</button>
       </div>
 
@@ -532,10 +533,29 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
     chapters: new Set(chapters),
     limit: 0,
     shuffle: true,
+    freshFirst: true,
     wrongOnly: false,
     queue: [], idx: 0, answered: false, results: [], picks: []
   };
   let wrongPool = LS.get("tcm_wrong_v1", {});   // {id: times}
+  let seenPool = LS.get("tcm_seen_v1", {});     // {id: 練過次數}，跨輪保留
+
+  /* 依「練過次數」分層排題：未練過的先出，同層內再隨機 */
+  function arrange(pool){
+    if(!state.freshFirst) return state.shuffle ? shuffleCopy(pool) : pool;
+    const buckets = new Map();
+    pool.forEach(q => {
+      const c = seenPool[q.id] || 0;
+      if(!buckets.has(c)) buckets.set(c, []);
+      buckets.get(c).push(q);
+    });
+    let out = [];
+    [...buckets.keys()].sort((a, b) => a - b).forEach(k => {
+      const group = state.shuffle ? shuffleCopy(buckets.get(k)) : buckets.get(k);
+      out = out.concat(group);
+    });
+    return out;
+  }
 
   /* ── 設定畫面 ── */
   function renderSubjects(){
@@ -596,7 +616,9 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
   function refreshInfo(){
     const pool = selectedQuestions();
     const n = state.limit ? Math.min(state.limit, pool.length) : pool.length;
-    $("#pickInfo").textContent = `本次可練 ${n} 題 · 錯題池 ${Object.keys(wrongPool).length} 題`;
+    const done = pool.filter(q => seenPool[q.id]).length;
+    const left = pool.length - done;
+    $("#pickInfo").textContent = `本次可練 ${n} 題 · 本章節已練 ${done}/${pool.length}（未練 ${left}）· 錯題池 ${Object.keys(wrongPool).length} 題`;
     $("#btnStart").disabled = n === 0;
     $("#btnStart").style.opacity = n === 0 ? .45 : 1;
   }
@@ -606,6 +628,7 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
       b.classList.toggle("on", Number(b.dataset.limit) === state.limit);
     });
     $("#btnShuffle").classList.toggle("on", state.shuffle);
+    $("#btnFresh").classList.toggle("on", state.freshFirst);
     $("#btnWrongOnly").classList.toggle("on", state.wrongOnly);
   }
 
@@ -614,10 +637,13 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
     if(b){ state.limit = Number(b.dataset.limit); renderOptionToggles(); refreshInfo(); }
   });
   $("#btnShuffle").onclick = () => { state.shuffle = !state.shuffle; renderOptionToggles(); };
+  $("#btnFresh").onclick = () => { state.freshFirst = !state.freshFirst; renderOptionToggles(); refreshInfo(); };
   $("#btnWrongOnly").onclick = () => { state.wrongOnly = !state.wrongOnly; renderOptionToggles(); refreshInfo(); };
 
   $("#btnReset").onclick = () => {
-    wrongPool = {}; LS.set("tcm_wrong_v1", wrongPool); refreshInfo();
+    wrongPool = {}; LS.set("tcm_wrong_v1", wrongPool);
+    seenPool = {}; LS.set("tcm_seen_v1", seenPool);
+    refreshInfo();
     const btn = $("#btnReset");
     btn.textContent = "已清除";
     setTimeout(()=>{ btn.textContent = "清除紀錄"; }, 1400);
@@ -625,13 +651,7 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
 
   /* ── 開始 ── */
   $("#btnStart").onclick = () => {
-    let pool = selectedQuestions().slice();
-    if(state.shuffle){
-      for(let i = pool.length - 1; i > 0; i--){
-        const j = Math.floor(Math.random() * (i + 1));
-        [pool[i], pool[j]] = [pool[j], pool[i]];
-      }
-    }
+    let pool = arrange(selectedQuestions().slice());
     if(state.limit) pool = pool.slice(0, state.limit);
     if(!pool.length) return;
     state.queue = pool; state.idx = 0; state.results = []; state.picks = [];
@@ -716,6 +736,8 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
     if(!ok) wrongPool[q.id] = (wrongPool[q.id] || 0) + 1;
     else if(wrongPool[q.id]) delete wrongPool[q.id];
     LS.set("tcm_wrong_v1", wrongPool);
+    seenPool[q.id] = (seenPool[q.id] || 0) + 1;
+    LS.set("tcm_seen_v1", seenPool);
 
     const acc = Math.round(state.results.filter(r=>r.ok).length / state.results.length * 100);
     $("#accLive").textContent = `正確率 ${acc}%`;
@@ -836,7 +858,7 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
   $("#btnCards").onclick = () => {
     const pool = cardPool();
     if(!pool.length){ $("#pickInfo").textContent = "本科尚無題目"; return; }
-    deck.queue = shuffleCopy(pool);
+    deck.queue = arrange(pool);
     if(state.limit) deck.queue = deck.queue.slice(0, state.limit);
     deck.idx = 0; deck.right = 0; deck.wrong = 0;
     deck.judged = false; deck.record = null; deck.busy = false;
