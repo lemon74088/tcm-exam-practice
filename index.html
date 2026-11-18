@@ -107,6 +107,12 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
 .chip:hover{border-color:rgba(200,169,106,.5);color:var(--paper)}
 .chip.on{background:linear-gradient(150deg,rgba(127,194,173,.20),rgba(127,194,173,.05));border-color:rgba(127,194,173,.55);color:#dff3ea}
 .chip .c{font-size:11px;opacity:.72}
+.chip-all{
+  border-color:rgba(200,169,106,.55);color:#e8d8b6;
+  background:linear-gradient(150deg,rgba(200,169,106,.16),rgba(200,169,106,.04));
+}
+.chip-all:hover{border-color:rgba(200,169,106,.85);color:#fff3d8}
+.chip-all .sep{width:1px;height:12px;background:rgba(200,169,106,.45)}
 
 /* ── rows ── */
 .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
@@ -590,12 +596,21 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
   }
 
   function renderChips(){
-    $("#chapterChips").innerHTML = chapters.map(c => {
-      const n = Q.filter(q => q.ch === c).length;
-      const on = state.chapters.has(c);
-      return `<button class="chip ${on?'on':''}" data-ch="${c}">${c}<span class="c">${n}</span></button>`;
-    }).join("");
-    $("#chapterChips").querySelectorAll(".chip").forEach(el=>{
+    const allOn = chapters.length > 0 && state.chapters.size === chapters.length;
+    const totalN = Q.filter(q => chapters.includes(q.ch)).length;
+    $("#chapterChips").innerHTML =
+      `<button class="chip chip-all" id="chipAll">${allOn ? "取消全選" : "全選"}<span class="sep"></span><span class="c">${totalN}</span></button>` +
+      chapters.map(c => {
+        const n = Q.filter(q => q.ch === c).length;
+        const on = state.chapters.has(c);
+        return `<button class="chip ${on?'on':''}" data-ch="${c}">${c}<span class="c">${n}</span></button>`;
+      }).join("");
+    $("#chipAll").onclick = () => {
+      if(allOn){ state.chapters.clear(); }
+      else { chapters.forEach(c => state.chapters.add(c)); }
+      renderChips(); refreshInfo();
+    };
+    $("#chapterChips").querySelectorAll(".chip[data-ch]").forEach(el=>{
       el.onclick = () => {
         const c = el.dataset.ch;
         state.chapters.has(c) ? state.chapters.delete(c) : state.chapters.add(c);
