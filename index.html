@@ -79,10 +79,17 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
   content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;
   background:linear-gradient(140deg,rgba(255,255,255,.07),transparent 38%,transparent 62%,rgba(255,255,255,.03));
 }
-.sec-title{display:flex;align-items:center;gap:12px;margin:0 0 16px}
+.sec-title{display:flex;align-items:center;gap:12px;margin:0 0 16px;flex-wrap:wrap;row-gap:8px}
 .sec-title .dot{width:6px;height:6px;border-radius:50%;background:var(--gold);box-shadow:0 0 12px var(--gold)}
 .sec-title h2{margin:0;font-size:14px;font-weight:500;letter-spacing:.18em;color:var(--paper)}
 .sec-title .hint{margin-left:auto;font-size:11.5px;color:var(--paper-dim);letter-spacing:.1em}
+.allbtn{
+  font-family:var(--serif);cursor:pointer;border-radius:999px;padding:5px 13px;font-size:12px;letter-spacing:.06em;
+  border:1px solid rgba(200,169,106,.6);color:#f0dfb9;
+  background:linear-gradient(150deg,rgba(200,169,106,.20),rgba(200,169,106,.05));
+  transition:.22s ease;
+}
+.allbtn:hover{border-color:rgba(200,169,106,.95);color:#fff6de;box-shadow:0 0 14px rgba(200,169,106,.28)}
 
 /* ── subject ── */
 .subjects{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
@@ -107,12 +114,6 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
 .chip:hover{border-color:rgba(200,169,106,.5);color:var(--paper)}
 .chip.on{background:linear-gradient(150deg,rgba(127,194,173,.20),rgba(127,194,173,.05));border-color:rgba(127,194,173,.55);color:#dff3ea}
 .chip .c{font-size:11px;opacity:.72}
-.chip-all{
-  border-color:rgba(200,169,106,.55);color:#e8d8b6;
-  background:linear-gradient(150deg,rgba(200,169,106,.16),rgba(200,169,106,.04));
-}
-.chip-all:hover{border-color:rgba(200,169,106,.85);color:#fff3d8}
-.chip-all .sep{width:1px;height:12px;background:rgba(200,169,106,.45)}
 
 /* ── rows ── */
 .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
@@ -305,7 +306,7 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
       <div class="sec-title"><span class="dot"></span><h2>科目</h2><span class="hint">九科已全數開放</span></div>
       <div class="subjects" id="subjectList"></div>
 
-      <div class="sec-title" style="margin-top:26px"><span class="dot"></span><h2>章節</h2><span class="hint" id="chHint"></span></div>
+      <div class="sec-title" style="margin-top:26px"><span class="dot"></span><h2>章節</h2><span class="hint" id="chHint"></span><button class="allbtn" id="chipAll">全選</button></div>
       <div class="chips" id="chapterChips"></div>
 
       <div class="sec-title" style="margin-top:26px"><span class="dot"></span><h2>練習方式</h2></div>
@@ -597,19 +598,18 @@ h1{margin:0;font-size:26px;font-weight:600;letter-spacing:.14em}
 
   function renderChips(){
     const allOn = chapters.length > 0 && state.chapters.size === chapters.length;
-    const totalN = Q.filter(q => chapters.includes(q.ch)).length;
-    $("#chapterChips").innerHTML =
-      `<button class="chip chip-all" id="chipAll">${allOn ? "取消全選" : "全選"}<span class="sep"></span><span class="c">${totalN}</span></button>` +
-      chapters.map(c => {
-        const n = Q.filter(q => q.ch === c).length;
-        const on = state.chapters.has(c);
-        return `<button class="chip ${on?'on':''}" data-ch="${c}">${c}<span class="c">${n}</span></button>`;
-      }).join("");
-    $("#chipAll").onclick = () => {
+    const btn = $("#chipAll");
+    btn.textContent = allOn ? "取消全選" : "全選";
+    btn.onclick = () => {
       if(allOn){ state.chapters.clear(); }
       else { chapters.forEach(c => state.chapters.add(c)); }
       renderChips(); refreshInfo();
     };
+    $("#chapterChips").innerHTML = chapters.map(c => {
+      const n = Q.filter(q => q.ch === c).length;
+      const on = state.chapters.has(c);
+      return `<button class="chip ${on?'on':''}" data-ch="${c}">${c}<span class="c">${n}</span></button>`;
+    }).join("");
     $("#chapterChips").querySelectorAll(".chip[data-ch]").forEach(el=>{
       el.onclick = () => {
         const c = el.dataset.ch;
